@@ -1,0 +1,133 @@
+
+CREATE DATABASE calendar_of_events;
+USE calendar_of_events;
+
+
+CREATE TABLE IF NOT EXISTS user_info (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    last_name VARCHAR(50) NOT NULL,
+    first_name VARCHAR(50) NOT NULL,
+    middle_initial VARCHAR(5),
+    username VARCHAR(30) NOT NULL,
+    user_email VARCHAR(100) NOT NULL UNIQUE,
+    phone_number VARCHAR(20),
+    password VARCHAR(100) NOT NULL
+);
+
+
+CREATE TABLE IF NOT EXISTS event (
+    event_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    event_type VARCHAR(50) NOT NULL,
+    title VARCHAR(100) NOT NULL,
+    description TEXT,
+    start_time DATETIME,
+    end_time DATETIME,
+    event_status VARCHAR(50),
+    FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE CASCADE
+);
+
+
+CREATE TABLE IF NOT EXISTS event_update (
+    update_id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_by VARCHAR(100),
+    end_time DATETIME,
+    update_reason VARCHAR(255),
+    FOREIGN KEY (event_id) REFERENCES event(event_id) ON DELETE CASCADE
+);
+
+
+CREATE TABLE IF NOT EXISTS countdown (
+    countdown_id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    time_remaining VARCHAR(50),
+    FOREIGN KEY (event_id) REFERENCES event(event_id) ON DELETE CASCADE
+);
+
+
+CREATE TABLE IF NOT EXISTS event_summary (
+    summary_id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    summary_text TEXT,
+    FOREIGN KEY (event_id) REFERENCES event(event_id) ON DELETE CASCADE
+);
+
+-- Modify user_info table to add creation_date and update password column length for hash
+ALTER TABLE user_info 
+MODIFY COLUMN password VARCHAR(255) NOT NULL,
+ADD COLUMN creation_date DATETIME DEFAULT CURRENT_TIMESTAMP;
+
+-- Add additional fields to event table
+ALTER TABLE event
+ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN location VARCHAR(255),
+ADD COLUMN is_recurring BOOLEAN DEFAULT FALSE;
+
+-- Modify event_update table to track status changes
+ALTER TABLE event_update
+ADD COLUMN old_status VARCHAR(50),
+ADD COLUMN new_status VARCHAR(50);
+
+-- Create event notification table
+CREATE TABLE IF NOT EXISTS event_notification (
+    notification_id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    user_id INT NOT NULL,
+    notification_type VARCHAR(50) NOT NULL, -- 'email', 'app', etc.
+    notify_before_minutes INT DEFAULT 30,
+    is_sent BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (event_id) REFERENCES event(event_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE CASCADE
+);
+
+-- Create recurring events table
+CREATE TABLE IF NOT EXISTS recurring_event (
+    recurring_id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    recurrence_pattern VARCHAR(50) NOT NULL, -- 'daily', 'weekly', 'monthly', 'yearly'
+    recurrence_interval INT DEFAULT 1,
+    recurrence_day_of_week VARCHAR(20),
+    recurrence_week_of_month INT,
+    recurrence_month INT,
+    recurrence_end_date DATE,
+    recurrence_count INT,
+    FOREIGN KEY (event_id) REFERENCES event(event_id) ON DELETE CASCADE
+);
+
+-- Create user settings table
+CREATE TABLE IF NOT EXISTS user_settings (
+    settings_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    default_notification_time INT DEFAULT 30, -- minutes before event
+    theme VARCHAR(20) DEFAULT 'light',
+    calendar_view VARCHAR(20) DEFAULT 'month',
+    FOREIGN KEY (user_id) REFERENCES user_info(user_id) ON DELETE CASCADE
+);
+
+-- Create event sharing table
+CREATE TABLE IF NOT EXISTS event_sharing (
+    sharing_id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    shared_by INT NOT NULL,
+    shared_with INT NOT NULL,
+    permission VARCHAR(20) DEFAULT 'view', -- 'view', 'edit', 'admin'
+    shared_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (event_id) REFERENCES event(event_id) ON DELETE CASCADE,
+    FOREIGN KEY (shared_by) REFERENCES user_info(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (shared_with) REFERENCES user_info(user_id) ON DELETE CASCADE
+);
+
+-- Updating the countdown table to add created_at and last_updated
+ALTER TABLE countdown
+ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN last_updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+-- Create indexes for better query performance
+CREATE INDEX idx_event_user_id ON event(user_id);
+CREATE INDEX idx_event_start_time ON event(start_time);
+CREATE INDEX idx_event_status ON event(event_status);
+CREATE INDEX idx_event_update_event_id ON event_update(event_id);
+CREATE INDEX idx_event_summary_event_id ON event_summary(event_id);
